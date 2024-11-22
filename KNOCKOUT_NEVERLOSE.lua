@@ -238,11 +238,17 @@ local menuitems = {
 	
 	-- rage_helpers = group_ragehelpers:switch("Enhance Ragebot", false),
 
-    exploit_l1 = group_EXPLOITS_4:label("Perfectly break LC. Jump with Double Tap enabled. Low ping required."),
+    exploit_l1 = group_EXPLOITS_4:label("Attempts to break LC on enemy peek. Double Tap must be enabled while you're in air. Lower ping is preferred."),
 	-- exploit_tutorial = group_EXPLOITS:button(ui.get_icon("youtube") .." Exploit Showcase", function()
     --     require("neverlose/mtools").Panorama:OpenLink("https://www.youtube.com/watch?v=TBAvlJlRaq4&pp=ygUKdmFuaXR5IGh2aA%3D%3D")
     -- end),
-    ourexploit = group_EXPLOITS_4:switch("LC On Peek"),
+    ourexploit = group_EXPLOITS_4:switch("LC On Peek", false, function(gear)
+		local elements = {
+			only_safe_head = gear:switch("Only when safe head (duck/duck in air)", false)
+		}
+		
+		return elements, true
+	end),
 	
 	auto_tp = group_EXPLOITS_2:switch("Teleport", false, function(gear)
 		local elements = {
@@ -251,7 +257,7 @@ local menuitems = {
 		
 		return elements, true
 	end),
-	auto_tp_about = group_EXPLOITS_2:label("Attempts to automatically 'DT SLAM' for you which basically means teleporting you to the ground if you peek an enemy while being in air. This helps break lag compensation and instantly kill them shoot them before they could even react."),
+	auto_tp_about = group_EXPLOITS_2:label("Attempts to automatically 'DT SLAM' for you which basically means teleporting you to the ground if you peek an enemy while being in air. This helps break lag compensation and instantly shoot them before their cheat reacts."),
 	auto_tp_about_btn = group_EXPLOITS_2:button("What's this?"),
 	
     defensive_aa = group_EXPLOITS:switch("Defensive AA", false, function(gear)
@@ -262,6 +268,7 @@ local menuitems = {
 		
 		return elements, true
 	end),
+	
     defensive_aa_triggers = group_EXPLOITS:listable("Triggers", {"In air", "Threat Detected (recommended)"}),
 	defensive_aa_pitch_enable = group_EXPLOITS:switch("Modify Pitch", false, function(gear)
 		local elements = {
@@ -908,9 +915,17 @@ function run_ragebot_fps_fix()
 	end
 end
 
-function run_air_lag(in_air)   
-    if menuitems.ourexploit:get() and cheatmenu.Double_tap:get() and in_air then
+local function nade_held()
+	if get_weapon_name(entity.get_local_player()) == "weapon_smokegrenade" or get_weapon_name(entity.get_local_player()) == "weapon_hegrenade" or get_weapon_name(entity.get_local_player()) == "weapon_flashgrenade" or get_weapon_name(entity.get_local_player()) == "weapon_incgrenade" or get_weapon_name(entity.get_local_player()) == "weapon_molotov" then
+		return true
+	end
+	return false
+end
+
+function run_break_lc(in_air, cmd)   
+    if menuitems.ourexploit:get() and cheatmenu.Double_tap:get() and in_air and not nade_held() then
 		if not entity.get_threat(true) then return end
+		if menuitems.ourexploit.only_safe_head:get() and not cmd.in_duck then return end
 		if globals.tickcount % 1.2 == 0.000 then
 			definitions.render_lc_indicator = true
 			cheatmenu.Double_tap:override(false)
@@ -1004,7 +1019,7 @@ function run_defensive_aa(cmd, in_air)
 				if menuitems.defensive_aa.disablers:get(3) and get_weapon_name(definitions.localplayer()) == 'weapon_taser' then return end
 
 
-				if math.floor(globals.realtime * 1000) % 2 == 0 then
+				if math.floor(globals.realtime * 1000) % 3 == 2 then
 					-- our flick var
 					definitions.jitter_side = definitions.jitter_side * -1 -- this var always returns either 1 or -1. So you can think of it as ON and OFF.
 					-- pitch
@@ -1239,12 +1254,6 @@ function run_anti_bruteforce()
 	end
 end
 
-local function nade_held()
-	if get_weapon_name(entity.get_local_player()) == "weapon_smokegrenade" or get_weapon_name(entity.get_local_player()) == "weapon_hegrenade" or get_weapon_name(entity.get_local_player()) == "weapon_flashgrenade" or get_weapon_name(entity.get_local_player()) == "weapon_incgrenade" or get_weapon_name(entity.get_local_player()) == "weapon_molotov" then
-		return true
-	end
-	return false
-end
 
 local function run_non_desync_aa(in_air, cmd)
 
@@ -1446,7 +1455,7 @@ function run_shot_logs(e)
 			if menuitems.logs_enable.complexity:get() == "Default"  then
 				log_string = log_prefix .. toolong_logname .. "'s ".. "\a" .. log_color .. shot_hitbox .. definitions.white .. " due to " .. "\a" .. logging_death_color:get():to_hex() .. string.upper(miss_reason) .. definitions.white .. "."
 			elseif menuitems.logs_enable.complexity:get() == "Detailed"  then
-				log_string = log_prefix .. toolong_logname .. "'s ".. "\a" .. log_color .. shot_hitbox .. definitions.white .. " due to " .. "\a" .. logging_death_color:get():to_hex() .. string.upper(miss_reason) .. definitions.white ..  " | " .. "\a" .. log_color .. " Hitchance: " .. shot_hitchance .. "%."
+				log_string = log_prefix .. toolong_logname .. "'s ".. "\a" .. log_color .. shot_hitbox .. definitions.white .. " due to " .. "\a" .. logging_death_color:get():to_hex() .. string.upper(miss_reason) .. definitions.white ..  " | " .. "\a" .. log_color .. " Hitchance: " .. shot_hitchance .. "%"  .. definitions.white .. " | Backtracked: " .. "\a" .. log_color .. shot_BT .. " Ticks" .. definitions.white .. " | " .. "\a" .. log_color .. shot_entity_health_remaining .. definitions.white .. " Health Remaining."
 			end
         end
 
@@ -1616,7 +1625,7 @@ events.createmove:set(function(cmd)
 	run_disable_rendering_models(menuitems.fps_fix.mitigations)
 	-- run_non_desync_aa(in_air, cmd)
 	run_nade_fix()
-	run_air_lag(in_air)
+	run_break_lc(in_air, cmd)
 	run_leg_breaker()
 	run_update_conditional_aa()
 	run_defensive_aa(cmd, in_air)
